@@ -46,6 +46,7 @@ exports.resize = async (req, res, next) => {
 
 exports.createStore = async (req, res) => {
   // multer allows for uploading a fi
+  req.body.author = req.user._id;
   const store = new Store(req.body);
   await store.save();
   req.flash(
@@ -62,15 +63,24 @@ exports.getStores = async (req, res) => {
 };
 
 exports.getStoreBySlug = async (req, res, next) => {
-  const store = await Store.findOne({ slug: req.params.slug });
+  const store = await Store.findOne({ slug: req.params.slug }).populate(
+    'author'
+  );
   if (!store) {
     return next();
   }
   res.render('store', { store, title: store.name });
 };
 
+const confirmOwner = (store, user) => {
+  if (!store.author.equals(user._id)) {
+    throw Error('You must own a store in order to edit it');
+  }
+};
+
 exports.editStore = async (req, res) => {
   const store = await Store.findOne({ _id: req.params.id });
+  confirmOwner(store, req.user);
   res.render('editStore', { title: `Edit ${store.name}`, store });
 };
 
@@ -94,4 +104,23 @@ exports.getStoresByTag = async (req, res) => {
   const storesPromise = Store.find({ tags: tagQuery });
   const [tags, stores] = await Promise.all([tagsPromise, storesPromise]);
   res.render('tag', { tags, title: 'Tags', tag, stores });
+};
+
+exports.searchStores = async (req, res) => {
+  const stores = await Store.find(
+    {
+      $text: {
+        $search: req.query.q,
+      },
+    },
+    {
+      score: { $meta: 'textScore' },
+    }
+  )
+    .sort({
+      score: { $meta: 'textScore' },
+    })
+    .limit(5);
+  // limit to 5 results
+  res.json(stores);
 };
