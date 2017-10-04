@@ -1,4 +1,5 @@
-const axios = require('axios');
+import axios from 'axios';
+import dompurify from 'dompurify';
 
 function searchResultsHTML(stores) {
   return stores
@@ -32,24 +33,30 @@ function typeAhead(search) {
       .get(`/api/search?q=${this.value}`)
       .then(res => {
         if (res.data.length) {
-          searchResults.innerHTML = searchResultsHTML(res.data);
+          searchResults.innerHTML = dompurify.sanitize.searchResultsHTML(
+            res.data
+          );
+          return;
         }
+        // tell them nothing came back
+        searchResults.innerHTML = dompurify.sanitize`<div class="search__result">No results for ${this
+          .value} found!</div>`;
       })
       .catch(err => {
         console.error(err);
       });
   });
 
-  //handle keyboard inouts
+  //handle keyboard inputs
   searchInput.on('keyup', e => {
-    //if they arent pressing up down or enter, who cares
+    // if they arent pressing up down or enter, who cares
     if (![38, 40, 13].includes(e.keyCode)) {
       return; // do nada
     }
     const activeClass = 'search__result--active';
     const current = search.querySelector(`.${activeClass}`);
-    console.log(activeClass);
-    const items = search.querySelectorAll('.search__results');
+    const items = search.querySelectorAll('.search__result');
+
     let next;
     if (e.keyCode === 40 && current) {
       next = current.nextElementSibling || items[0];
